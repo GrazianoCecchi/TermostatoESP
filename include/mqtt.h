@@ -108,7 +108,41 @@ void sendMQTTTemperatureDiscoveryMsg() {
   size_t n = serializeJson(doc, buffer);
 
   mqttClient.publish(discoveryTopic.c_str(), buffer, n);
+  mqttClient.publish(discoveryTopic.c_str(), buffer, n);
 }
+
+void sendMQTTTemperatureMSG(){
+
+ DynamicJsonDocument doc(1024);
+    char buffer[256];
+
+    // doc["humidity"] = humidity;
+    doc["temperature"]   = 23.5;
+    // doc["moisture"] = moisturePercentage;
+
+    size_t n = serializeJson(doc, buffer);
+
+    bool published = mqttClient.publish(stateTopic.c_str(), buffer, n);
+
+
+}
+
+
+
+//invio il messaggio ogni tot di tempo
+void SendMQTTMSG(){
+  static unsigned long TempoPrecedente;
+  unsigned long TempoAttuale = millis();
+  if(TempoAttuale -TempoPrecedente > 3000){
+    TempoPrecedente = TempoAttuale ;
+    sendMQTTTemperatureMSG();
+
+}
+
+
+}
+
+
 
 
 
@@ -143,11 +177,16 @@ sendMQTTTemperatureDiscoveryMsg();
 void loop_mqtt(){
     if (!mqttClient.connected()) {
         connect();
-        sendMQTTTemperatureDiscoveryMsg();
+      
     }
- 
+
     mqttClient.loop();
     timeClient.update();
+  SendMQTTMSG();
+
+
+
+
 }
 
 
