@@ -38,7 +38,33 @@ void sendMQTTmsg(){
 }
 
 
-//prova
+
+
+//faccio lampeggiare il led per manifestare che il software è vivo
+unsigned long Intervallo = 1500;
+void loopLed(){
+  static unsigned long TempoPrecedente;
+  unsigned long TempoAttuale = millis();
+  if(TempoAttuale -TempoPrecedente > Intervallo){
+    TempoPrecedente = TempoAttuale ;
+    //inverto il tempo di accensione per tenerlo spento solo mezzo secondo
+    switch (Intervallo)
+    {
+      case 1500:
+        Intervallo = 500;
+        digitalWrite(LED_BUILTIN, false);
+      break;
+
+      case 500:
+        Intervallo = 1500;
+        digitalWrite(LED_BUILTIN, true);
+      break;
+    }
+}
+
+
+}
+
 
 
 void setup() {
@@ -66,29 +92,5 @@ void loop() {
 
 
 
-//faccio lampeggiare il led per manifestare che il software è vivo
-unsigned long Intervallo = 1500;
-void loopLed(){
-  static unsigned long TempoPrecedente;
-  unsigned long TempoAttuale = millis();
-  if(TempoAttuale -TempoPrecedente > Intervallo){
-    TempoPrecedente = TempoAttuale ;
-    //inverto il tempo di accensione per tenerlo spento solo mezzo secondo
-    switch (Intervallo)
-    {
-      case 1500:
-        Intervallo = 500;
-        digitalWrite(LED_BUILTIN, false);
-      break;
-
-      case 500:
-        Intervallo = 1500;
-        digitalWrite(LED_BUILTIN, true);
-      break;
-    }
-}
-
-
-}
 
 

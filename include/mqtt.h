@@ -3,6 +3,8 @@
 #include <WiFi.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include <ArduinoJson.h>
+
 
 
 
@@ -88,6 +90,29 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 
 
+
+String stateTopic = "home/plants/" + String(1) + "/state";
+void sendMQTTTemperatureDiscoveryMsg() {
+  String discoveryTopic = "homeassistant/sensor/plant_sensor_" + String(1) + "/temperature/config";
+
+  DynamicJsonDocument doc(1024);
+  char buffer[256];
+
+  doc["name"] = "Plant " + String(1) + " Temperature";
+  doc["stat_t"]   = stateTopic;
+  doc["unit_of_meas"] = "°C";
+  doc["dev_cla"] = "temperature";
+  doc["frc_upd"] = true;
+  doc["val_tpl"] = "{{ value_json.temperature|default(0) }}";
+
+  size_t n = serializeJson(doc, buffer);
+
+  mqttClient.publish(discoveryTopic.c_str(), buffer, n);
+}
+
+
+
+
 //--------------------------------------
 // sub che deve essere eseguita ad durante il set up
 // inserisci qui il tuo codice
@@ -106,6 +131,9 @@ void setup_mqtt(){
     wifiClient.setInsecure();
   #endif
 #endif
+sendMQTTTemperatureDiscoveryMsg();
+
+
 }
 
 //--------------------------------------
@@ -115,11 +143,44 @@ void setup_mqtt(){
 void loop_mqtt(){
     if (!mqttClient.connected()) {
         connect();
+        sendMQTTTemperatureDiscoveryMsg();
     }
  
     mqttClient.loop();
     timeClient.update();
 }
+
+
+
+
+
+// // My numeric sensor ID, you can change this to whatever suits your needs
+// int sensorNumber = 1
+
+// // This is the topic this program will send the state of this device to.
+// String stateTopic = "home/plants/" + String(sensorNumber) + "/state";
+
+// void sendMQTTTemperatureDiscoveryMsg() {
+//   // This is the discovery topic for this specific sensor
+//   String discoveryTopic = "homeassistant/sensor/termostato_casa_" + String(sensorNumber) + "/temperature/config";
+
+//   DynamicJsonDocument doc(1024);
+//   char buffer[256];
+
+//   doc["name"] = "Plant " + String(sensorNumber) + " Temperature";
+//   doc["stat_t"]   = stateTopic;
+//   doc["unit_of_meas"] = "°C";
+//   doc["dev_cla"] = "temperature";
+//   doc["frc_upd"] = true;
+//   // I'm sending a JSON object as the state of this MQTT device
+//   // so we'll need to unpack this JSON object to get a single value
+//   // for this specific sensor.
+//   doc["val_tpl"] = "{{ value_json.temperature|default(0) }}";
+
+//   size_t n = serializeJson(doc, buffer);
+
+//   client.publish(discoveryTopic.c_str(), buffer, n);
+// }
 
 
 #endif //MQTT_H
