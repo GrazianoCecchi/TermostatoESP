@@ -52,28 +52,43 @@ void setup() {
 }
 
 unsigned long TempoPrecedente = 0;
-boolean Acceso = false;
+
 
 void loop() {
   loop_mqtt();
   //sendMQTTmsg();
   loopOTA();
-unsigned long TempoAttuale = millis();
-if(TempoAttuale-TempoPrecedente > 5000){
-  TempoPrecedente = TempoAttuale ;
-  Serial.print("Questo è un ESP8266, ");
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  Acceso = !Acceso;
-  digitalWrite(LED_BUILTIN, Acceso); 
-}
-
-
-
+  loopWiFi();
+  loopLed();
 }
 
 
 
 
+
+//faccio lampeggiare il led per manifestare che il software è vivo
+unsigned long Intervallo = 1500;
+void loopLed(){
+  static unsigned long TempoPrecedente;
+  unsigned long TempoAttuale = millis();
+  if(TempoAttuale -TempoPrecedente > Intervallo){
+    TempoPrecedente = TempoAttuale ;
+    //inverto il tempo di accensione per tenerlo spento solo mezzo secondo
+    switch (Intervallo)
+    {
+      case 1500:
+        Intervallo = 500;
+        digitalWrite(LED_BUILTIN, false);
+      break;
+
+      case 500:
+        Intervallo = 1500;
+        digitalWrite(LED_BUILTIN, true);
+      break;
+    }
+}
+
+
+}
 
 

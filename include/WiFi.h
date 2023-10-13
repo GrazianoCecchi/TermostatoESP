@@ -45,6 +45,16 @@ void setup_wifi() {
   ;
 }
 
+void loopWiFi(){
+  static unsigned long TempoPrecedente;
+  unsigned long TempoAttuale = millis();
+    if(TempoAttuale -TempoPrecedente > 5000){
+    TempoPrecedente = TempoAttuale ;
+    Serial.print("Questo è un ESP8266, ");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+  }
+}
 
 
 #endif //WIFI_H
