@@ -11,215 +11,176 @@
 #ifndef MQTT_H
 #define MQTT_H
 
-// file che contiene il certificato TLS
-// #include "certificate.h" //da abilitare e creare il file per abilitare la comunicazione TLS
-
-#define CERT mqtt_broker_cert
-#define MSG_BUFFER_SIZE (50)
-
-//--------------------------------------
-// Configurazione (modificare prima della compilazione)
-//--------------------------------------
-//#define MQTT_TLS // se non commentato abilita la comunicazione TLS
-//#define MQTT_TLS_VERIFY // se non commentato abilita la verifica TLS della connessione con il brocker
-
-const uint16_t mqtt_server_port = 1883; // o 8883 sono moltoi usate 
-const char* mqttTopicIn = "Termostato-in";
-const char* mqttTopicOut = "Termostato-out";
 
 
-
-//--------------------------------------
-// variabili globali
-//--------------------------------------
-#ifdef MQTT_TLS
-  WiFiClientSecure wifiClient;
-#else
-  WiFiClient wifiClient;
-#endif
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
-PubSubClient mqttClient(wifiClient);
+/*-------------------------------------------------------------------------------------------------------------------------------------*/
+//TODOP------------------------------------------------ Configurazione ----------------------------------------------------------------*/
+/*-------------------------------------------------------------------------------------------------------------------------------------*/
+const char*         ModelloDispositivo    = "NodeMCU_V3";                            // Modello scheda
+const char*         VersioneFirmware      = "1.0";                                    // Versione Firmware
+const char*         Produttore            = "Graziano Cecchi";                        // Produttore
+String              NomeDispositvo        = "Termostato-casa";                        //! Nome del dispositivo
+String              mqttStatusTopic       = "nodemcuv3/" + NomeDispositvo;       // MQTT Topic
+const char*         ServerMQTT            = "192.168.1.8";                           // Indirizzo del server MQTT
+int                 PortaServerMQTT       = 1883;    
 
 
+/*-----------------------------------------------------------------------------------------------------------------------------------------------*/
+/*------------------------------------------------------ Variabili pubbliche --------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------------------------------------------------------------------------------*/
+WiFiClient          g_WiFiClient;
+PubSubClient        g_mqttPubSub(g_WiFiClient);
+bool                MQTT_Inizializzato = false;
+// unsigned long       g_Time = 0;
+// int                 g_count = 0;
+// int                 g_input_Door; 
+// int                 g_old_input_Door = 0;
+// String              g_strDoorStatus;
+ int                   g_mqttCounterConn = 0;
+// float               g_Humidity = 0.0;
+// float               g_Temperature = 0.0;
+// bool                MQTT_Inizializzato = true;
+String                 IdentificativoUnico;
+// bool                g_SendMqttData = false;
+// DHT                 g_dht(DHTPIN, DHTTYPE);
 
-//--------------------------------------
-// funzione per connettere o riconnettere il brocker
-// mqtt
-//--------------------------------------
-void connect() {
-  while (!mqttClient.connected()) {
-    Serial.print("Attendo  la connessione MQTT ...");
-    String mqttClientId = "";
-    if (mqttClient.connect(mqttClientId.c_str(), mqttUser, mqttPassword)) {
-      Serial.println("    connesso");
-      mqttClient.subscribe(mqttTopicIn);
-    } else {
-      Serial.print("Fallito, rc=");
-      Serial.print(mqttClient.state());
-      Serial.println(" ritento fra 5 secondi");
-      delay(5000);
+void setup_mqtt(){
+     g_mqttPubSub.setServer(ServerMQTT, PortaServerMQTT);
+    g_mqttPubSub.setCallback(MqttReceiverCallback);
+}
+
+void loop_mqtt(){
+
+
+    if(WiFi.status() == WL_CONNECTED)
+    {
+        if(!g_mqttPubSub.connected())
+            MqttReconnect();
+        else
+            g_mqttPubSub.loop();
     }
-  }
-}
+
+    if(!MQTT_Inizializzato)
+    {
+        delay(100);
+        MQTT_Inizializzato = true;
+        Serial.println("Inizializzo connessione MQTT ...");
+        MqttHomeAssistantDiscovery();     // Invio i dati per il discoveri
+    }
 
 
-
-
-
-
-
-
-//--------------------------------------
-// funzione callback che viene lanciata ogni volta che riceve un messaggio
-// inserisci qua il tuo codice
-//--------------------------------------
-void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Messagio arrivato su topic: '");
-  Serial.print(topic);
-  Serial.print("' con payload: ");
-  for (unsigned int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-
-  String myCurrentTime = timeClient.getFormattedTime();
-  mqttClient.publish(mqttTopicOut,("ESP8266: Risponde: " + myCurrentTime).c_str());
-}
-
-
-
-
-
-String stateTopic = "home/plants/" + String(1) + "/state";
-void sendMQTTTemperatureDiscoveryMsg() {
-  String discoveryTopic = "homeassistant/sensor/plant_sensor_" + String(1) + "/temperature/config";
-
-  DynamicJsonDocument doc(1024);
-  char buffer[256];
-
-  doc["name"] = "Plant " + String(1) + " Temperature";
-  doc["stat_t"]   = stateTopic;
-  doc["unit_of_meas"] = "°C";
-  doc["dev_cla"] = "temperature";
-  doc["frc_upd"] = true;
-  doc["val_tpl"] = "{{ value_json.temperature|default(0) }}";
-
-  size_t n = serializeJson(doc, buffer);
-
-  mqttClient.publish(discoveryTopic.c_str(), buffer, n);
-  mqttClient.publish(discoveryTopic.c_str(), buffer, n);
-}
-
-void sendMQTTTemperatureMSG(){
-
- DynamicJsonDocument doc(1024);
-    char buffer[256];
-
-    // doc["humidity"] = humidity;
-    doc["temperature"]   = 23.5;
-    // doc["moisture"] = moisturePercentage;
-
-    size_t n = serializeJson(doc, buffer);
-
-    bool published = mqttClient.publish(stateTopic.c_str(), buffer, n);
-
-
-}
-
-
-
-//invio il messaggio ogni tot di tempo
-void SendMQTTMSG(){
   static unsigned long TempoPrecedente;
   unsigned long TempoAttuale = millis();
-  if(TempoAttuale -TempoPrecedente > 3000){
-    TempoPrecedente = TempoAttuale ;
-    sendMQTTTemperatureMSG();
+  if(TempoAttuale -TempoPrecedente > 5000){
+    TempoPrecedente = TempoAttuale ;      
+        {
+            StaticJsonDocument<200> payload;  
+            payload["temp"] = 27.3;
+
+            String strPayload;
+            serializeJson(payload, strPayload);
+
+            if(g_mqttPubSub.connected())
+            {
+                g_mqttPubSub.publish(mqttStatusTopic.c_str(), strPayload.c_str()); 
+                Serial.println("MQTT: Send Data!!!");
+                Serial.println(" ");
+                Serial.println(" ");
+
+            }
+        }
 
 }
 
-
 }
 
+void MqttHomeAssistantDiscovery()
+{
+    String discoveryTopic;
+    String payload;
+    String strPayload;
+    if(g_mqttPubSub.connected())
+    {
+        Serial.println("INVIO HOME ASSISTANT DISCOVERY!!!");
+        StaticJsonDocument<600> payload;
+        JsonObject device;
+        JsonArray identifiers;
 
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // Temperature
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        discoveryTopic = "homeassistant/sensor/nodemcuv3/" + NomeDispositvo + "_temp" + "/config";
+        
+        payload["name"] = NomeDispositvo + ".temp";
+        payload["uniq_id"] = IdentificativoUnico + "_temp";
+        payload["stat_t"] = mqttStatusTopic;
+        payload["dev_cla"] = "temperature";
+        payload["val_tpl"] = "{{ value_json.temp | is_defined }}";
+        payload["unit_of_meas"] = "°C";
+        device = payload.createNestedObject("device");
+        device["name"] = NomeDispositvo;
+        device["model"] = ModelloDispositivo;
+        device["sw_version"] = VersioneFirmware;
+        device["manufacturer"] = Produttore;
+        identifiers = device.createNestedArray("identifiers");
+        identifiers.add(IdentificativoUnico);
 
+        serializeJsonPretty(payload, Serial);
+        Serial.println(" ");
+        serializeJson(payload, strPayload);
 
+        g_mqttPubSub.publish(discoveryTopic.c_str(), strPayload.c_str());
 
+       
 
-//--------------------------------------
-// sub che deve essere eseguita ad durante il set up
-// inserisci qui il tuo codice
-//--------------------------------------
-void setup_mqtt(){
-    mqttClient.setServer(mqtt_server, mqtt_server_port);
-    mqttClient.setCallback(callback);
-
-      timeClient.begin();
-
-#ifdef MQTT_TLS
-  #ifdef MQTT_TLS_VERIFY
-    X509List *cert = new X509List(CERT);
-    wifiClient.setTrustAnchors(cert);
-  #else
-    wifiClient.setInsecure();
-  #endif
-#endif
-sendMQTTTemperatureDiscoveryMsg();
-
-
-}
-
-//--------------------------------------
-// sub che deve essere eseguita ad ogni loop
-// inserisci qui il tuo codice
-//--------------------------------------
-void loop_mqtt(){
-    if (!mqttClient.connected()) {
-        connect();
-      
     }
-
-    mqttClient.loop();
-    timeClient.update();
-  SendMQTTMSG();
-
-
-
-
 }
 
+void MqttReconnect() 
+{
+    // Loop until we're reconnected
+    while (!g_mqttPubSub.connected()  && (g_mqttCounterConn++ < 4))
+    {
+        Serial.print("Tentativo di connessione MQTT...");
+        // Attempt to connect
+        if (g_mqttPubSub.connect(NomeDispositvo.c_str(), mqttUser, mqttPassword)) 
+        {
+            Serial.println("connesso");
+            // Subscribe
+            g_mqttPubSub.subscribe("homeassistant/status");
+            delay(100);
+        } else 
+        {
+            Serial.print("falliuto, rc=");
+            Serial.print(g_mqttPubSub.state());
+            Serial.println(" ritento fra un secondo");
+            delay(1000);
+        }
+    }  
+    g_mqttCounterConn = 0;
+}
 
-
-
-
-// // My numeric sensor ID, you can change this to whatever suits your needs
-// int sensorNumber = 1
-
-// // This is the topic this program will send the state of this device to.
-// String stateTopic = "home/plants/" + String(sensorNumber) + "/state";
-
-// void sendMQTTTemperatureDiscoveryMsg() {
-//   // This is the discovery topic for this specific sensor
-//   String discoveryTopic = "homeassistant/sensor/termostato_casa_" + String(sensorNumber) + "/temperature/config";
-
-//   DynamicJsonDocument doc(1024);
-//   char buffer[256];
-
-//   doc["name"] = "Plant " + String(sensorNumber) + " Temperature";
-//   doc["stat_t"]   = stateTopic;
-//   doc["unit_of_meas"] = "°C";
-//   doc["dev_cla"] = "temperature";
-//   doc["frc_upd"] = true;
-//   // I'm sending a JSON object as the state of this MQTT device
-//   // so we'll need to unpack this JSON object to get a single value
-//   // for this specific sensor.
-//   doc["val_tpl"] = "{{ value_json.temperature|default(0) }}";
-
-//   size_t n = serializeJson(doc, buffer);
-
-//   client.publish(discoveryTopic.c_str(), buffer, n);
-// }
+void MqttReceiverCallback(char* topic, byte* inFrame, unsigned int length) 
+{
+    Serial.print("Arrivato messaggio con topic: ");
+    Serial.print(topic);
+    Serial.print(". Messaggio: ");
+    byte state = 0;
+    String messageTemp;
+    
+    for (int i = 0; i < length; i++) 
+    {
+        Serial.print((char)inFrame[i]);
+        messageTemp += (char)inFrame[i];
+    }
+    Serial.println();
+  
+    if(String(topic) == String("homeassistant/status")) 
+    {
+        if(messageTemp == "online")
+            MqttHomeAssistantDiscovery();
+    }
+}
 
 
 #endif //MQTT_H
